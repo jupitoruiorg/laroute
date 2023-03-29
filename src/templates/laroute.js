@@ -8,6 +8,33 @@
             rootUrl: '$ROOTURL$',
             routes : $ROUTES$,
             prefix: '$PREFIX$',
+            extensions: $EXTENSIONS$,
+
+            extensions_main: function() {
+                return Object.keys(routes.extensions);
+            },
+
+            extensions_customizations: function() {
+                let data = [];
+
+                Object.values(routes.extensions).forEach(val => {
+                    if (val === null) {
+                        return;
+                    }
+
+                    data = [...data, [val]];
+                });
+
+                return data;
+            },
+
+            checkIfStringStartsWith: function(str, substrs) {
+                return substrs.some(substr => str.startsWith(substr));
+            },
+
+            routeIsFromCustomization: function(route) {
+                return this.checkIfStringStartsWith(route, this.extensions_customizations());
+            },
 
             route : function (name, parameters, route) {
                 route = route || this.getByName(name);
@@ -136,6 +163,30 @@
             // $NAMESPACE$.route('routeName', [params = {}])
             route : function (route, parameters) {
                 parameters = parameters || {};
+
+                if (routes.routeIsFromCustomization(route)) {
+                    return routes.route(route, parameters);
+                }
+
+                let route_customization = null;
+
+                Object.keys(routes.extensions).forEach(extension_main => {
+                    let dependency = routes.extensions[extension_main];
+
+                    if (dependency === null) {
+                        return;
+                    }
+
+                    if (!routes.checkIfStringStartsWith(route, [extension_main])) {
+                        return;
+                    }
+
+                    route_customization = routes.route(route.replace(extension_main, dependency), parameters);
+                });
+
+                if (route_customization) {
+                    return route_customization;
+                }
 
                 return routes.route(route, parameters);
             },
